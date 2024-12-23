@@ -46,12 +46,22 @@ async function main() {
     })
     console.log("LPToken contract address: " + LPTokenTx.options.address + '\n')
 
+    let RewardPerBlock = {10: 1e9, 100: 1e12, 1000: 1e18}
+	const fee = 3;
+
 	const TFarmContract = new web3.eth.Contract(TokenFarm.abi);
     TFarmContract.handleRevert = true;
 
 	const rawContract = TFarmContract.deploy({
 		data: TokenFarm.bytecode,
-		arguments: [ DappTx.options.address, LPTokenTx.options.address ],
+		arguments: [ 
+            DappTx.options.address, 
+            LPTokenTx.options.address,
+            fee,
+            RewardPerBlock[10],
+            RewardPerBlock[100],
+            RewardPerBlock[1000]
+        ],
 	});
 
     
