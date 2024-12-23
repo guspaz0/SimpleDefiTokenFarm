@@ -5,10 +5,6 @@ import {DappToken} from "./DappToken.sol";
 import {LPToken} from "./LPToken.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/**
- * @title Proportional Token Farm
- * @notice Una granja de staking donde las recompensas se distribuyen proporcionalmente al total stakeado.
- */
 contract TokenFarm is ReentrancyGuard {
     //
     // Variables de estado
@@ -17,19 +13,20 @@ contract TokenFarm is ReentrancyGuard {
     address public owner;
     DappToken public dappToken;
     LPToken public lpToken;
-    //uint256 public constant REWARD_PER_BLOCK = 1e18; // Recompensa por bloque (total para todos los usuarios)
     mapping(uint256 => uint256) public Reward_Per_Block;
-    uint256 public totalStakingBalance; // Total de tokens en staking
-
-    struct structUser {
-        uint256 stackingBalance; //balance de stacking del usuario
-        uint256 checkpoint; //ultimo bloque de stacking del usuario
-        uint256 pendingReward; //recompensas pendientes
-        bool hasStaked; // si el usuario hizo staking alguna vez
-        bool isStaking; // si el usuario tiene un staking actualmente
-    }
+    uint256 public totalStakingBalance;
+    uint256 public fee;
+    uint256 private feeBalance = 0;
 
     address[] public stakers;
+
+    struct structUser {
+        uint256 stackingBalance;    // balance de stacking del usuario
+        uint256 checkpoint;         // ultimo bloque de stacking del usuario
+        uint256 pendingReward;      // recompensas pendientes
+        bool hasStaked;             // si el usuario hizo staking alguna vez
+        bool isStaking;             // si el usuario tiene un staking actualmente
+    }
     
     mapping(address => structUser) public users;
 
@@ -45,37 +42,37 @@ contract TokenFarm is ReentrancyGuard {
 
     event RangeRewardUpdated(uint256 _range, uint256 _reward);
 
+    event FeeClaimed(uint256 _amount);
+
     // Constructor
     constructor(
         DappToken _dappToken, 
         LPToken _lpToken,
+        uint256 _fee,
         uint256 _range10, 
         uint256 _range100, 
         uint256 _range1000
-        ) {
+    ) {
         // Configurar las instancias de los contratos de DappToken y LPToken.
         // Configurar al owner del contrato como el creador de este contrato.
         dappToken = _dappToken;
         lpToken = _lpToken;
+        fee = _fee;
         Reward_Per_Block[10] = _range10;
         Reward_Per_Block[100] = _range100;
         Reward_Per_Block[1000] = _range1000;
         owner = msg.sender;
     }
-    
-    modifier onlyOwner() {
-        require(owner == msg.sender, "solo el propietario puede operar");
-        _;
-    }
+
     modifier onlyStaker() {
         require(users[msg.sender].isStaking, "solo usuarios con stacking pueden operar");
         _;
     }
+    modifier onlyOwner() {
+        require(owner == msg.sender, "solo el propietario puede operar");
+        _;
+    }
 
-    /**
-     * @notice Deposita tokens LP para staking.
-     * @param _amount Cantidad de tokens LP a depositar.
-     */
     function deposit(uint256 _amount) external nonReentrant {
         // Verificar que _amount sea mayor a 0.
         require(_amount > 0, "La cantidad no puede ser menor a 0");
@@ -105,32 +102,7 @@ contract TokenFarm is ReentrancyGuard {
         // Emitir un evento de depósito.
         emit Deposit(msg.sender, _amount);
     }
-
-    /**
-     * @notice Retira todos los tokens LP en staking.
-     */
-    function withdraw() external onlyStaker nonReentrant {
-        structUser storage user = users[msg.sender];
-        uint256 balance = user.stackingBalance;
-        // Verificar que el balance de staking sea mayor a 0.
-        require(balance > 0, "el balance del Stack del usuario no es mayor a cero");
-        // Transferir los tokens LP de vuelta al usuario.
-        bool success = lpToken.transfer(msg.sender, balance);
-        require(success,"Error al transferir LpToken");
-        // Llamar a distributeRewards para calcular y actualizar las recompensas pendientes antes de restablecer el balance.
-        distributeRewards(msg.sender);
-        // Restablecer stakingBalance del usuario a 0.
-        user.stackingBalance = 0;
-        // Reducir totalStakingBalance en el balance que se está retirando.
-        totalStakingBalance -= balance;
-        // Actualizar isStaking del usuario a false.
-        user.isStaking = false;
-        
-        // Emitir un evento de retiro.
-        emit Withdraw(msg.sender, balance);
-    }
-
-    /**
+       /**
      * @notice Reclama recompensas pendientes.
      */
     function claimRewards() external {
@@ -139,12 +111,14 @@ contract TokenFarm is ReentrancyGuard {
         uint256 pendingAmount = user.pendingReward;
         // Verificar que el monto de recompensas pendientes sea mayor a 0.
         require(pendingAmount > 0,"el monto de recompensas debe ser mayor a 0");
+        uint256 retainFee = (user.pendingReward*1e18 * fee/100)/1e18;
+        feeBalance += retainFee;
         // Restablecer las recompensas pendientes del usuario a 0.
         user.pendingReward = 0;
         // Llamar a la función de acuñación (mint) en el contrato DappToken para transferir las recompensas al usuario.
-        dappToken.mint(msg.sender, pendingAmount);
+        dappToken.mint(msg.sender, pendingAmount-retainFee);
         // Emitir un evento de reclamo de recompensas.
-        emit RewardsClaimed(msg.sender, pendingAmount);
+        emit RewardsClaimed(msg.sender, pendingAmount-retainFee);
     }
 
     function updateRewardRange(uint256 range, uint256 reward) public onlyOwner {
@@ -170,47 +144,40 @@ contract TokenFarm is ReentrancyGuard {
         
         emit RewardsDistributed("recompensas distribuidas");
     }
+    /**
+     * @notice Retira todos los tokens LP en staking.
+     */
+    function withdraw() external onlyStaker nonReentrant {
+        structUser storage user = users[msg.sender];
+        uint256 balance = user.stackingBalance;
+        // Verificar que el balance de staking sea mayor a 0.
+        require(balance > 0, "el balance del Stack del usuario no es mayor a cero");
+        // Transferir los tokens LP de vuelta al usuario.
+        bool success = lpToken.transfer(msg.sender, balance);
+        require(success,"Error al transferir LpToken");
+        // Llamar a distributeRewards para calcular y actualizar las recompensas pendientes antes de restablecer el balance.
+        distributeRewards(msg.sender);
+        // Restablecer stakingBalance del usuario a 0.
+        user.stackingBalance = 0;
+        // Reducir totalStakingBalance en el balance que se está retirando.
+        totalStakingBalance -= balance;
+        // Actualizar isStaking del usuario a false.
+        user.isStaking = false;   
+        // Emitir un evento de retiro.
+        emit Withdraw(msg.sender, balance);
+    }
 
     /**
-     * @notice Calcula y distribuye las recompensas proporcionalmente al staking total.
-     * @dev La función toma en cuenta el porcentaje de tokens que cada usuario tiene en staking con respecto
-     *      al total de tokens en staking (`totalStakingBalance`).
-     *
-     * Funcionamiento:
-     * 1. Se calcula la cantidad de bloques transcurridos desde el último checkpoint del usuario.
-     * 2. Se calcula la participación proporcional del usuario:
-     *    share = stakingBalance[beneficiary] / totalStakingBalance
-     * 3. Las recompensas para el usuario se determinan multiplicando su participación proporcional
-     *    por las recompensas por bloque (`REWARD_PER_BLOCK`) y los bloques transcurridos:
-     *    reward = REWARD_PER_BLOCK * blocksPassed * share
-     * 4. Se acumulan las recompensas calculadas en `pendingRewards[beneficiary]`.
-     * 5. Se actualiza el checkpoint del usuario al bloque actual.
-     *
-     * Ejemplo Práctico:
-     * - Supongamos que:
-     *    Usuario A ha stakeado 100 tokens.
-     *    Usuario B ha stakeado 300 tokens.
-     *    Total de staking (`totalStakingBalance`) = 400 tokens.
-     *    `REWARD_PER_BLOCK` = 1e18 (1 token total por bloque).
-     *    Han transcurrido 10 bloques desde el último checkpoint.
-     *
-     * Cálculo:
-     * - Participación de Usuario A:
-     *   shareA = 100 / 400 = 0.25 (25%)
-     *   rewardA = 1e18 * 10 * 0.25 = 2.5e18 (2.5 tokens).
-     *
-     * - Participación de Usuario B:
-     *   shareB = 300 / 400 = 0.75 (75%)
-     *   rewardB = 1e18 * 10 * 0.75 = 7.5e18 (7.5 tokens).
-     *
-     * Resultado:
-     * - Usuario A acumula 2.5e18 en `pendingRewards`.
-     * - Usuario B acumula 7.5e18 en `pendingRewards`.
-     *
-     * Nota:
-     * Este sistema asegura que las recompensas se distribuyan proporcionalmente y de manera justa
-     * entre todos los usuarios en función de su contribución al staking total.
+    *@notice El owner puede retirar los fees obtenidos por las recompensas de los usuarios
      */
+    function withdrawFee() external onlyOwner {
+        require(feeBalance > 0, "fee balance must be greater than 0");
+        uint256 feeAvailable = feeBalance;
+        feeBalance = 0;
+        dappToken.mint(msg.sender, feeAvailable);
+        emit FeeClaimed(feeAvailable);
+    }
+    
     function distributeRewards(address beneficiary) private {
         // Obtener el último checkpoint del usuario desde checkpoints.
         structUser storage user = users[beneficiary];
