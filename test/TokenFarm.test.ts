@@ -1,7 +1,7 @@
 import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
 import { expect } from 'chai';
 import { web3, network } from 'hardhat';
-import TokenFarmArtifact from '../artifacts/contracts/TokenFarmV2.sol/TokenFarmV2.json';
+import TokenFarmArtifact from '../artifacts/contracts/TokenFarm.sol/TokenFarm.json';
 import deployLpTokenFixture from './LpToken.test';
 import deployDappTokenFixture from './DappToken.test';
 
