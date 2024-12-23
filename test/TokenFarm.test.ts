@@ -198,7 +198,6 @@ describe('TokenFarmV2', function () {
 			const balanceBefore = await dappToken.methods.balanceOf(owner).call({from: owner});
 			const withdrawFee = await tokenFarm.methods.withdrawFee().send({from: owner});
 			const balanceAfter = await dappToken.methods.balanceOf(owner).call({from: owner});
-			console.log('fee: '+ Number(withdrawFee.events.FeeClaimed.returnValues._amount))
 			expect(Number(withdrawFee.events.FeeClaimed.returnValues._amount)).to.be.equal(Number(balanceAfter)-Number(balanceBefore))
 		})
 	}) 
