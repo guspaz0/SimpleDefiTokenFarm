@@ -20,6 +20,7 @@ describe('TokenFarmV2', function () {
 		const rawContract = TokenFarmContract.deploy({
 			data: TokenFarmArtifact.bytecode,
 			arguments: [
+				deployer,
 				DappToken.options.address, 
 				LpToken.options.address,
 				fee, //fee

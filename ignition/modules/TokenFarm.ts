@@ -1,18 +1,30 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import DappToken from './DappToken'
+import LPToken from './LpToken'
 
 // deploy command
 // npx hardhat ignition deploy ignition/modules/SimpleBank.ts --network <network> --verify
 
-const BASIS_POINTS_FEE = 100; // Default 1% fee (100 basis points)
-const Owner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; // Replace with actual treasury address
+const Owner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const RewardPerBlock = {10: 1e9, 100: 1e12, 1000: 1e15}
+const fee = 3;
 
-const SimpleBankModule = buildModule("SimpleBankModule", (m) => {
-  const fee = m.getParameter("fee", BASIS_POINTS_FEE);
-  const treasury = m.getParameter("treasury", TREASURY_ADDRESS);
+const TokenFarm = buildModule("TokenFarm", (m) => {
 
-  const simpleBank = m.contract("SimpleBank", [fee, treasury]);
+  const { dappToken, addrDapp } = m.useModule(DappToken);
+  const { lpToken, addrLp } = m.useModule(LPToken); 
 
-  return { simpleBank };
+  const tokenFarm = m.contract("TokenFarm",[
+    Owner,
+    addrDapp,
+    addrLp,
+    fee,
+    RewardPerBlock[10],
+    RewardPerBlock[100],
+    RewardPerBlock[1000]
+  ])
+
+  return { dappToken, lpToken, tokenFarm };
 });
 
-export default SimpleBankModule;
+export default TokenFarm;

@@ -8,9 +8,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract LPToken is ERC20, Ownable {
     constructor(
         address initialOwner
-    ) ERC20("LP Token", "LPT") Ownable(initialOwner) {}
+    ) ERC20("LP Token", "LPT") Ownable(initialOwner) {
+        emit Deployed(address(this));
+    }
 
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
     }
+    event Deployed(address addr);
 }
