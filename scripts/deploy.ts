@@ -3,6 +3,9 @@ import TokenFarm from '../artifacts/contracts/TokenFarm.sol/TokenFarm.json';
 import DappToken from '../artifacts/contracts/DappToken.sol/DappToken.json';
 import LPtoken from '../artifacts/contracts/LPtoken.sol/LPtoken.json';
 
+const RewardPerBlock = {10: 1e9, 100: 1e12, 1000: 1e15}
+const fee = 3;
+
 async function main() {
      
     const [deployer] = await web3.eth.getAccounts();
@@ -46,8 +49,7 @@ async function main() {
     })
     console.log("LPToken contract address: " + LPTokenTx.options.address + '\n')
 
-    let RewardPerBlock = {10: 1e9, 100: 1e12, 1000: 1e18}
-	const fee = 3;
+
 
 	const TFarmContract = new web3.eth.Contract(TokenFarm.abi);
     TFarmContract.handleRevert = true;
@@ -55,6 +57,7 @@ async function main() {
 	const rawContract = TFarmContract.deploy({
 		data: TokenFarm.bytecode,
 		arguments: [ 
+            deployer,
             DappTx.options.address, 
             LPTokenTx.options.address,
             fee,

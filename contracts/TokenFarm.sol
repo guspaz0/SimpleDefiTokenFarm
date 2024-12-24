@@ -46,11 +46,12 @@ contract TokenFarm is ReentrancyGuard {
 
     // Constructor
     constructor(
-        DappToken _dappToken, 
+        address _owner,
+        DappToken _dappToken,
         LPToken _lpToken,
         uint256 _fee,
-        uint256 _range10, 
-        uint256 _range100, 
+        uint256 _range10,
+        uint256 _range100,
         uint256 _range1000
     ) {
         // Configurar las instancias de los contratos de DappToken y LPToken.
@@ -61,7 +62,7 @@ contract TokenFarm is ReentrancyGuard {
         Reward_Per_Block[10] = _range10;
         Reward_Per_Block[100] = _range100;
         Reward_Per_Block[1000] = _range1000;
-        owner = msg.sender;
+        owner = _owner;
     }
 
     modifier onlyStaker() {
