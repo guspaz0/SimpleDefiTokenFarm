@@ -7,15 +7,33 @@ Para mas informacion sobre contratos de farming, sirvase este sitio:
 
 Para inicializar el proyecto debes tener el framework hardhat instalado:
 
-Intenta correr algunos de estos comandos:
-
+Comando para ayuda de hardhat:
 ```shell
 npx hardhat help
+```
+
+Los test estan escritos todos con Web3 y libreria Chai
+Comando para correr los tests:
+```shell
 npx hardhat test
-REPORT_GAS=true npx hardhat test
+```
+
+Comando para levantar el nodo local de hardhat:
+```shell
 npx hardhat node
+```
+
+Para deployar los contratos, esta disponible de dos maneras:
+- con Ignition:
+```shell
+npx hardhat ignition deploy ignition/modules/TokenFarm.ts --network localhost
+```
+
+- con Web3.js:
+```shell
 npx hardhat run scripts/deploy.ts --network localhost
 ```
+
 
 Para setear variables de entorno, usar "vars" de hardhat:
 
