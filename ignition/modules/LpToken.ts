@@ -1,10 +1,12 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-const Owner = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const Owner = "";
 
 const LPToken = buildModule("LPToken", (m) => {
 
-  const lpToken = m.contract("LPToken", [Owner]);
+  const proxyAdminOwner = Owner || m.getAccount(0);
+
+  const lpToken = m.contract("LPToken", [proxyAdminOwner]);
 
   const addrLp = m.readEventArgument(lpToken, "Deployed", "addr");
 
