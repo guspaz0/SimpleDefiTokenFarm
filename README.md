@@ -6,6 +6,11 @@ Para mas informacion sobre contratos de farming, sirvase este sitio:
 [Cómo usar Farms (Yield Farming) en PancakeSwap](https://docs.pancakeswap.finance/products/yield-farming/how-to-use-farms)
 
 Para inicializar el proyecto debes tener el framework hardhat instalado:
+```shell
+# tener Node.js instalado
+npm i --save-dev hardhat web3 @nomicfoundation/hardhat-toolbox @nomicfoundation/hardhat-web3-v4
+npm i @openzeppelin/contracts @openzeppelin/contracts-upgradeable
+```
 
 Comando para ayuda de hardhat:
 ```shell
@@ -13,7 +18,7 @@ npx hardhat help
 ```
 ---
 ## TokenFarm "V1"
-La version "original" del Smart Contract pero modificada para ser 'upgradeable' mediante un Proxie transparente y actualizable por el Proxy Admin del mismo. 
+La version "original" del Smart Contract pero modificada para ser 'upgradeable' mediante un Proxy transparente y actualizable por el contracto "Proxy Admin" del mismo. 
 
 Esta Compuesto por 5 Smart Contracts: 
 - DappToken:    Usado para que los usuarios "stakers" puedan cobrar sus recompensas.
@@ -41,7 +46,7 @@ Esto levantara el nodo local hardhat y hara el deploy de 5 Smart Contracts:
 ---
 ## TokenFarm "V2"
 
-Ademas de toda la funcionalidad de la V1, en este Smart Contract se agrega la posibilidad de establecer una comision "fee", aplicada sobre las rempenzas que retiran los usuarios stakers, y que el propietario pueda retirar dichas comisiones.
+Ademas de toda la funcionalidad de la V1, en este Smart Contract se agrega la posibilidad de establecer una comision "fee", aplicada sobre las recompenzas que retiran los usuarios stakers, y que el propietario pueda retirar dichas comisiones.
 
 Comando para correr los tests:
 ```shell
