@@ -12,6 +12,10 @@ contract TokenFarmV2 is TokenFarm {
 
     event FeeClaimed(uint256 _amount);
 
+    constructor(){
+        _disableInitializers();
+    }
+
     function setFee(
         uint256 _fee
     ) public {
@@ -27,7 +31,7 @@ contract TokenFarmV2 is TokenFarm {
      * @notice Reclama recompensas pendientes.
      */
      function claimRewards() override external {
-        structUser storage user = users[msg.sender];
+        StructUser storage user = users[msg.sender];
         uint256 pendingAmount = user.pendingReward;
         require(pendingAmount > 0,"el monto de recompensas debe ser mayor a 0");
         uint256 retainFee = (user.pendingReward*1e18 * fee/100)/1e18;

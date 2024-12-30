@@ -16,12 +16,12 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
     string constant public name = "Proportional Token Farm";
     DappToken public dappToken;
     LPToken public lpToken;
-    mapping(uint256 => uint256) public Reward_Per_Block;
+    mapping(uint256 => uint256) public RewardPerBlock;
     uint256 public totalStakingBalance;
 
     address[] internal stakers;
 
-    struct structUser {
+    struct StructUser {
         uint256 stackingBalance;    // balance de stacking del usuario
         uint256 checkpoint;         // ultimo bloque de stacking del usuario
         uint256 pendingReward;      // recompensas pendientes
@@ -29,7 +29,7 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
         bool isStaking;             // si el usuario tiene un staking actualmente
     }
     
-    mapping(address => structUser) internal users;
+    mapping(address => StructUser) internal users;
 
 
     event Deposit(address indexed _sender, uint256 _amount);
@@ -53,13 +53,13 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
         __Ownable_init(InitialOwner);
         dappToken = _dappToken;
         lpToken = _lpToken;
-        Reward_Per_Block[10] = _range10;
-        Reward_Per_Block[100] = _range100;
-        Reward_Per_Block[1000] = _range1000;
+        RewardPerBlock[10] = _range10;
+        RewardPerBlock[100] = _range100;
+        RewardPerBlock[1000] = _range1000;
     }
 
     modifier onlyStaker() {
-        require(users[msg.sender].isStaking, "solo usuarios con stacking pueden operar");
+        require(users[msg.sender].hasStaked, "solo usuarios con stacking pueden operar");
         _;
     }
 
@@ -72,19 +72,19 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
         return stakers;
     }
 
-    function getUserInfo(address _addr) public view onlyStaker returns(structUser memory _users) {
-        return users[_addr];
+    function getUserInfo(address _Addr) public view onlyStaker returns(StructUser memory _users) {
+        return users[_Addr];
     }
 
-    function deposit(uint256 _amount) external nonReentrant {
-        require(_amount > 0, "La cantidad no puede ser menor a 0");
-        bool success = lpToken.transferFrom(msg.sender, address(this), _amount);
+    function deposit(uint256 _Amount) external nonReentrant {
+        require(_Amount > 0, "La cantidad no puede ser menor a 0");
+        bool success = lpToken.transferFrom(msg.sender, address(this), _Amount);
         require(success, "Error in transfer from LpToken");
 
-        structUser storage user = users[msg.sender];
+        StructUser storage user = users[msg.sender];
         if (!user.hasStaked){
-            users[msg.sender] = structUser(
-                _amount,        //uint256 stackingBalance;
+            users[msg.sender] = StructUser(
+                _Amount,        //uint256 stackingBalance;
                 block.number,   //uint256 checkpoint;
                 0,              //uint256 pendingReward;
                 true,           //bool hasStaked;
@@ -92,29 +92,34 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
             );
             stakers.push(msg.sender);
         } else {
-            user.stackingBalance += _amount;
+            user.stackingBalance += _Amount;
         }
-        totalStakingBalance += _amount;
+        totalStakingBalance += _Amount;
         
         distributeRewards(msg.sender);
         
-        emit Deposit(msg.sender, _amount);
+        emit Deposit(msg.sender, _Amount);
     }
        /**
      * @notice Reclama recompensas pendientes.
      */
     function claimRewards() virtual external {
-        structUser storage user = users[msg.sender];
+        StructUser storage user = users[msg.sender];
+        // Obtener el monto de recompensas pendientes del usuario desde pendingRewards.
         uint256 pendingAmount = user.pendingReward;
+        // Verificar que el monto de recompensas pendientes sea mayor a 0.
         require(pendingAmount > 0,"el monto de recompensas debe ser mayor a 0");
+        // Restablecer las recompensas pendientes del usuario a 0.
         user.pendingReward = 0;
+        // Llamar a la función de acuñación (mint) en el contrato DappToken para transferir las recompensas al usuario.
         dappToken.mint(msg.sender, pendingAmount);
+        // Emitir un evento de reclamo de recompensas.
         emit RewardsClaimed(msg.sender, pendingAmount);
     }
 
     function updateRewardRange(uint256 range, uint256 reward) public onlyOwner {
         require(range == 10 || range == 100 || range == 1000, "the range provided does`nt exist");
-        Reward_Per_Block[range] = reward;
+        RewardPerBlock[range] = reward;
         emit RangeRewardUpdated(range, reward);
     }
 
@@ -139,7 +144,7 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
      * @notice Retira todos los tokens LP en staking.
      */
     function withdraw() external onlyStaker nonReentrant {
-        structUser storage user = users[msg.sender];
+        StructUser storage user = users[msg.sender];
         uint256 balance = user.stackingBalance;
         // Verificar que el balance de staking sea mayor a 0.
         require(balance > 0, "el balance del Stack del usuario no es mayor a cero");
@@ -160,7 +165,7 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
     
     function distributeRewards(address beneficiary) private {
         // Obtener el último checkpoint del usuario desde checkpoints.
-        structUser storage user = users[beneficiary];
+        StructUser storage user = users[beneficiary];
 
         // Calcular la cantidad de bloques transcurridos desde el último checkpoint.
         uint256 blocksPassed = block.number - user.checkpoint;
@@ -174,11 +179,11 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
         // Calcular las recompensas del usuario multiplicando la proporción por REWARD_PER_BLOCK y los bloques transcurridos.
         uint256 rewardPerBlock;
         if(blocksPassed <= 10) {
-            rewardPerBlock = Reward_Per_Block[10];
+            rewardPerBlock = RewardPerBlock[10];
         } else if (blocksPassed <= 100) {
-            rewardPerBlock = Reward_Per_Block[100];
+            rewardPerBlock = RewardPerBlock[100];
         } else if (blocksPassed <= 1000) {
-            rewardPerBlock = Reward_Per_Block[1000];
+            rewardPerBlock = RewardPerBlock[1000];
         }
         uint256 userReward = (participation * rewardPerBlock * blocksPassed)/1e18;
         // Actualizar las recompensas pendientes del usuario en pendingRewards.

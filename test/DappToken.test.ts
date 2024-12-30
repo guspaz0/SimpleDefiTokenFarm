@@ -1,7 +1,7 @@
 import { web3 } from 'hardhat';
 import DappTokenArtifact from '../artifacts/contracts/DappToken.sol/DappToken.json';
 
-async function deployDappTokenFixture() {
+export default async function deployDappTokenFixture() {
     const DappTokenContract = new web3.eth.Contract(DappTokenArtifact.abi);
     DappTokenContract.handleRevert = true;
 
@@ -23,5 +23,3 @@ async function deployDappTokenFixture() {
     //console.log('DappToken  contract deployed to: ', DappToken.options.address);
     return { DappToken, deployerDapp, otherAccount, DappTokenContract };
 }
-
-export default deployDappTokenFixture

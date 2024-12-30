@@ -1,7 +1,7 @@
 import { web3 } from 'hardhat';
 import LPtokenArtifact from '../artifacts/contracts/LPtoken.sol/LPtoken.json';
 
-async function deployLpTokenFixture() {
+export default async function deployLpTokenFixture() {
     const LpTokenContract = new web3.eth.Contract(LPtokenArtifact.abi);
     LpTokenContract.handleRevert = true;
 
@@ -23,5 +23,3 @@ async function deployLpTokenFixture() {
     //console.log('LpToken    contract deployed to: ', LpToken.options.address);
     return { LpToken, deployerLp, otherAccount2, LpTokenContract };
 }
-
-export default deployLpTokenFixture
