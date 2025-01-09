@@ -1,9 +1,9 @@
 import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
-import TokenFarmArtifact from '../artifacts/contracts/TokenFarm.sol/TokenFarm.json';
-import TUProxyArtifact from "../artifacts/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json";
-import ProxyAdminArtifact from "../artifacts/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol/ProxyAdmin.json";
-import deployLpTokenFixture from './LpToken.test';
-import deployDappTokenFixture from './DappToken.test';
+import TokenFarmArtifact from '../../artifacts/contracts/TokenFarm.sol/TokenFarm.json';
+import TUProxyArtifact from "../../artifacts/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json";
+import ProxyAdminArtifact from "../../artifacts/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol/ProxyAdmin.json";
+import deployLpTokenFixture from './FixtureLpToken';
+import deployDappTokenFixture from './FixtureDappToken';
 import { web3 } from 'hardhat';
 
 const RewardPerBlock = {10: 1e9, 100: 1e12, 1000: 1e15}

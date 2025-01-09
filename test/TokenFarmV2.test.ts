@@ -1,7 +1,7 @@
 import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
 import { expect } from 'chai';
 import { web3, network } from 'hardhat';
-import deployTokenFarmV2Fixture from './FixtureTokenFarmV2.test';
+import deployTokenFarmV2Fixture from './fixtures/FixtureTokenFarmV2';
 
 describe('TokenFarmV2', function () {
 
@@ -33,6 +33,24 @@ describe('TokenFarmV2', function () {
         expect(ownerDappToken).to.equal(proxy.options.address);
     });
 
+    it("If some user attempts to get User Info from an address that is not staking, should receive a error message", async function(){
+		const [owner, otherAccount] = await web3.eth.getAccounts();
+		try {
+			await proxy.methods.getUserInfo(otherAccount).send({from: otherAccount})
+		} catch (e) {
+			expect(e.cause.errorArgs.message).to.be.revertedWith("solo usuarios con stacking pueden operar")
+		}
+	}) 
+
+	it("An error must be thrown if some user attempts to call withdraw function and his balance is 0", async function(){
+		const [owner, otherAccount] = await web3.eth.getAccounts();
+		try {
+			await proxy.methods.withdraw().send({from: otherAccount})
+		} catch (e) {
+			expect(e.customErrorArguments.message).to.be.revertedWith("el balance del Stack del usuario no es mayor a cero")
+		}
+	})
+
     describe('Acuñar (mint) tokens LP para un usuario y realizar un depósito de esos tokens.', function () {
         const amountMinted = '1000'
         it('Current Balance of OtherAccount must be equal than initial balance plus amount after Mint of LpToken', async function () {
@@ -51,6 +69,15 @@ describe('TokenFarmV2', function () {
             const currentAllowance = await lpToken.methods.allowance(otherAccount, proxy.options.address).call({from: otherAccount});
             expect(currentAllowance).to.equal(initialAllowance+amountMinted);
         });
+
+        it("If the amount of deposit is less or equal than 0, the function is reverted", async function(){
+			const [deployer, otherAccount] = await web3.eth.getAccounts();
+			try {
+				await proxy.methods.deposit("0").send({from: otherAccount})
+			} catch (e) {
+				expect(e.customErrorArguments.message).to.be.revertedWith("La cantidad no puede ser menor a 0")
+			}
+		}) 
 
         it('After deposit LpTokens into TokenFarm, total Staking Balance must be increased in the same amount',async function(){
             const [deployer, otherAccount] = await web3.eth.getAccounts();
@@ -95,24 +122,28 @@ describe('TokenFarmV2', function () {
             let estimatedTotalRewards = 0;
             let TotalrewardsDistributed = 0;
             
-            for (let i = 0; i < userTransactions.length; i++){
-                let {amount, address, block} = userTransactions[i];
-                let rewardPerBlock;
-                const blocksPassed = Number(blockNumber) - Number(block);
-                if (blocksPassed <= 10) {
-                    rewardPerBlock = RewardPerBlock[10]
-                } else if (blocksPassed <= 100) {
-                    rewardPerBlock = RewardPerBlock[100]
-                } else if (blocksPassed <= 1000) {
-                    rewardPerBlock = RewardPerBlock[1000]
-                }
+			for (let i = 0; i < userTransactions.length; i++){
+				let {amount, address, block} = userTransactions[i];
+				let rewardPerBlock;
+				const blocksPassed = Number(blockNumber) - Number(block);
+				if (blocksPassed < 100) {
+					rewardPerBlock = RewardPerBlock[10];
+				}
+				if (blocksPassed >= 100 && blocksPassed < 1000) {
+					rewardPerBlock = RewardPerBlock[100];
+				} 
+				if (blocksPassed >= 1000) {
+					rewardPerBlock = RewardPerBlock[1000];
+				}
 
-                const participation = Number(amount) / Number(totalStakingBalance);
-                const userReward = participation * Number(rewardPerBlock) * blocksPassed;
-                estimatedTotalRewards += userReward;
-                const userInfo = await proxy.methods.getUserInfo(address).call({from: address});
-                TotalrewardsDistributed += Number(userInfo.pendingReward)
-            }
+				const participation = Number(amount) / Number(totalStakingBalance);
+				const userReward = participation * Number(rewardPerBlock) * blocksPassed;
+				estimatedTotalRewards += userReward;
+				const userInfo = await proxy.methods.getUserInfo(address).call({from: address});
+				TotalrewardsDistributed += Number(userInfo.pendingReward)
+			}
+			const AllStakers = await proxy.methods.getAllStakers().call({from: deployer})
+			expect(AllStakers).to.be.instanceOf(Array).and.length(userTransactions.length)
             expect(TotalrewardsDistributed).to.be.equal(estimatedTotalRewards)
         });
     })
@@ -161,7 +192,12 @@ describe('TokenFarmV2', function () {
         }) 
     })
     
-    describe("El Owner de TokenFarm puede retirar los fee obtenidos por las recompensas de los usuarios", function() {
+    describe("Despues de actualizar el contrato a V2, el Owner de TokenFarm puede retirar los fee obtenidos por las recompensas de los usuarios", function() {
+        it("Token farm version must be V2", async function(){
+            const [owner] = await web3.eth.getAccounts();
+            const version = await proxy.methods.version().call({from: owner})
+            expect(version).to.be.equal("2.0.0")
+        })
         it("the fee tax must be a number greater than 0 and less than 100",async function(){
             const [owner] = await web3.eth.getAccounts();
             const fee = await proxy.methods.fee().call({from: owner});

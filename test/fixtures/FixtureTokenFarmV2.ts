@@ -1,7 +1,7 @@
 import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
 import { web3 } from 'hardhat';
-import TokenFarmV2Artifact from '../artifacts/contracts/TokenFarmV2.sol/TokenFarmV2.json';
-import deployTokenFarmV1Fixture from './FixtureTokenFarmV1.test'
+import TokenFarmV2Artifact from '../../artifacts/contracts/TokenFarmV2.sol/TokenFarmV2.json';
+import deployTokenFarmV1Fixture from './FixtureTokenFarmV1'
 
 const fee = 3;
 

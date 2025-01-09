@@ -16,9 +16,7 @@ contract TokenFarmV2 is TokenFarm {
         _disableInitializers();
     }
 
-    function setFee(
-        uint256 _fee
-    ) public {
+    function setFee(uint256 _fee) public {
         fee = _fee;
     }
 
