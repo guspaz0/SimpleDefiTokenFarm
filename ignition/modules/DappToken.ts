@@ -10,7 +10,6 @@ const DappToken = buildModule("DappToken", (m) => {
 
   const addrDapp = m.readEventArgument(dappToken, "Deployed", "addr");
 
-
   return { 
         dappToken, 
         addrDapp

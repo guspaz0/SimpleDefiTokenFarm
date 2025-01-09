@@ -59,7 +59,8 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
     }
 
     modifier onlyStaker() {
-        require(users[msg.sender].hasStaked, "solo usuarios con stacking pueden operar");
+        StructUser memory user = users[msg.sender];
+        require(user.hasStaked, "solo usuarios con stacking pueden operar");
         _;
     }
 
@@ -170,19 +171,23 @@ contract TokenFarm is ReentrancyGuard, Initializable, OwnableUpgradeable {
         // Calcular la cantidad de bloques transcurridos desde el último checkpoint.
         uint256 blocksPassed = block.number - user.checkpoint;
         // Verificar que el número de bloque actual sea mayor al checkpoint y que totalStakingBalance sea mayor a 0.
-        if (blocksPassed == 0 || totalStakingBalance == 0) {
+        if (blocksPassed == 0) {
             return;
         }
-        
+        if (totalStakingBalance == 0) {
+            return;
+        }
         // Calcular la proporción del staking del usuario en relación al total staking (stakingBalance[beneficiary] / totalStakingBalance).
         uint256 participation = (user.stackingBalance * 1e18) / totalStakingBalance;
         // Calcular las recompensas del usuario multiplicando la proporción por REWARD_PER_BLOCK y los bloques transcurridos.
         uint256 rewardPerBlock;
-        if(blocksPassed <= 10) {
+        if (blocksPassed < 100) {
             rewardPerBlock = RewardPerBlock[10];
-        } else if (blocksPassed <= 100) {
+        }
+        if (blocksPassed >= 100 && blocksPassed < 1000) {
             rewardPerBlock = RewardPerBlock[100];
-        } else if (blocksPassed <= 1000) {
+        } 
+        if (blocksPassed >= 1000) {
             rewardPerBlock = RewardPerBlock[1000];
         }
         uint256 userReward = (participation * rewardPerBlock * blocksPassed)/1e18;

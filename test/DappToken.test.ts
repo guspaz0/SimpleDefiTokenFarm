@@ -1,25 +1,34 @@
-import { web3 } from 'hardhat';
-import DappTokenArtifact from '../artifacts/contracts/DappToken.sol/DappToken.json';
+import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers';
+import { expect } from 'chai';
+import { web3, network } from 'hardhat';
+import deployDappTokenFixture from './fixtures/FixtureDappToken';
 
-export default async function deployDappTokenFixture() {
-    const DappTokenContract = new web3.eth.Contract(DappTokenArtifact.abi);
-    DappTokenContract.handleRevert = true;
+describe('DappToken', function () {
+    let dappToken: any;
 
-    const [deployerDapp, otherAccount] = await web3.eth.getAccounts();
-    const rawContract = DappTokenContract.deploy({
-        data: DappTokenArtifact.bytecode,
-        arguments: [deployerDapp],
-    });
-
-    // To know how much gas will be consumed, we can estimate it first.
-    const estimateGas = await rawContract.estimateGas({from: deployerDapp});
-
-    const DappToken = await rawContract.send({
-        from: deployerDapp,
-        gas: estimateGas.toString(),
-        gasPrice: '10000000000',
-    });
-
-    //console.log('DappToken  contract deployed to: ', DappToken.options.address);
-    return { DappToken, deployerDapp, otherAccount, DappTokenContract };
-}
+    this.beforeAll(async function(){
+        const {	DappToken } = await loadFixture(deployDappTokenFixture)
+        dappToken = DappToken;
+    })
+	it("test Deploy events DappToken", async function(){
+		const EventsDapp = await dappToken.getPastEvents("Deployed",{
+            filter: {
+                //src: [Proxy.options.address] // se puede filtrar por propiedad "src" address o "dst" address
+            }, 
+            fromBlock: 1n,
+            toBlock: "latest",
+        })
+		const addrDapp = EventsDapp[0].returnValues.addr
+		expect(addrDapp).to.be.equal(dappToken.options.address)
+	})
+    it("solo el owner puede mintear",async function(){
+        const [owner, otherAccount] = await web3.eth.getAccounts()
+        try {
+            await dappToken.methods.mint(otherAccount, 1000).send({from: otherAccount}) 
+        } catch (e) {
+            expect(e).to.be.revertedWith("")
+        }
+        const amountMinted = await dappToken.methods.mint(otherAccount, 1000).send({from: owner})
+        expect(amountMinted).to.be.ok
+    })
+})
