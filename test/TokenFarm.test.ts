@@ -21,6 +21,21 @@ describe('TokenFarmV1', function () {
 		proxy = Proxy;
 	})
 
+	it("Initialize function cannot be called again", async function(){
+		const owner = await proxy.methods.owner().call();
+		try {
+			await proxy.methods.initialize(
+				owner,
+				dappToken.options.address,
+				lpToken.options.address,
+				RewardPerBlock[10],
+				RewardPerBlock[100],
+				RewardPerBlock[1000]
+			).call({from: owner})
+		} catch (e) {
+			expect(e).to.be.revertedWith("")
+		}
+	})
 
 	it("TokenFarm version must be V1", async function(){
 		const [owner] = await web3.eth.getAccounts();
@@ -34,15 +49,6 @@ describe('TokenFarmV1', function () {
 			await proxy.methods.getUserInfo(otherAccount).call({from: otherAccount})
 		} catch (e) {
 			expect(e.cause.errorArgs.message).to.be.revertedWith("solo usuarios con stacking pueden operar")
-		}
-	})
-
-	it("An error must be thrown if some user attempts to call withdraw function and his balance is 0", async function(){
-		const [owner, otherAccount] = await web3.eth.getAccounts();
-		try {
-			await proxy.methods.withdraw().send({from: otherAccount})
-		} catch (e) {
-			expect(e.customErrorArguments.message).to.be.revertedWith("el balance del Stack del usuario no es mayor a cero")
 		}
 	})
 
@@ -66,6 +72,7 @@ describe('TokenFarmV1', function () {
 
 		it('After approve minted LpToken amount of OtherAccount to spender TokenFarm, new allowance must be equal than initial allowance plus minted amount', async function () {
 			const [deployer, otherAccount] = await web3.eth.getAccounts();
+
 			const initialAllowance = await lpToken.methods.allowance(otherAccount, proxy.options.address).call({from: otherAccount});
 			await lpToken.methods.approve(proxy.options.address, amountMinted).send({from: otherAccount})
 			const currentAllowance = await lpToken.methods.allowance(otherAccount, proxy.options.address).call({from: otherAccount});
@@ -73,7 +80,12 @@ describe('TokenFarmV1', function () {
 		});
 
 		it("If the amount of deposit is less or equal than 0, the function is reverted", async function(){
-			const [deployer, otherAccount] = await web3.eth.getAccounts();
+			const [deployer, otherAccount, unallowed] = await web3.eth.getAccounts();
+			try {
+				await proxy.methods.deposit("1500").send({from: unallowed})
+			} catch (e) {
+				expect(e).to.be.revertedWith("message be kind of ERC20InsufficientAllowance error")
+			}
 			try {
 				await proxy.methods.deposit("0").send({from: otherAccount})
 			} catch (e) {
@@ -113,11 +125,17 @@ describe('TokenFarmV1', function () {
 		});
 		
 		it("Debe calcular correctamente las recompensas por bloque a cada usuario", async function() {
-			const [deployer] = await web3.eth.getAccounts();
+			const [deployer, notTheOwner] = await web3.eth.getAccounts();
 			const totalStakingBalance = await proxy.methods.totalStakingBalance().call({from: deployer});
 
 			await network.provider.request({method: "evm_increaseTime", params: [100]});
 			await network.provider.request({method: "evm_mine", params: []});
+
+			try {
+				await proxy.methods.distributeRewardsAll().send({from: notTheOwner});
+			} catch (e) {
+				expect(e).to.be.revertedWith("message be kind of unauthorized")
+			}
 
 			const distributeRewards = await proxy.methods.distributeRewardsAll().send({from: deployer});
 			const blockNumber = distributeRewards.blockNumber;
@@ -147,36 +165,62 @@ describe('TokenFarmV1', function () {
 			const AllStakers = await proxy.methods.getAllStakers().call({from: deployer})
 			expect(AllStakers).to.be.instanceOf(Array).and.length(userTransactions.length)
 			expect(TotalrewardsDistributed).to.be.equal(estimatedTotalRewards)
+			try {
+				await proxy.methods.getAllStakers().call({from: notTheOwner})
+			} catch(e) {
+				expect(e).to.be.revertedWith("message kind of Unauthorized")
+			} 
 		});
 	})
 
-	describe("Que un usuario pueda reclamar recompensas y verificar que se transfirieron correctamente a su cuenta.", function(){
-		it("when user call claimRewards, then the pending TokenFarm rewards must be 0", async function(){
-			const user = userTransactions[0]
-			const rewardsClaimed = await proxy.methods.claimRewards().send({from: user.address});
-			const userInfo = await proxy.methods.getUserInfo(user.address).call({from: user.address});
-			userTransactions[0] = {...user, rewards: rewardsClaimed.events.RewardsClaimed.returnValues._amount}
-			expect(Number(userInfo.pendingReward)).to.be.equal(0)
-		})
-		it("user must have his claimed TokenFarm rewards in DappTokens balance",async function(){
-			const user = userTransactions[0]
-			const balanceDapp = await dappToken.methods.balanceOf(user.address).call({from: user.address})
-			expect(balanceDapp).to.be.equal(user.rewards)
-		})
-	})
+    describe("Que un usuario pueda reclamar recompensas y verificar que se transfirieron correctamente a su cuenta.", function(){
+        it("when user call claimRewards, then the pending TokenFarm rewards must be 0", async function(){
+            const user = userTransactions[0]
+            const rewardsClaimed = await proxy.methods.claimRewards().send({from: user.address});
+            const userInfo = await proxy.methods.getUserInfo(user.address).call({from: user.address});
+            userTransactions[0] = {...user, rewards: rewardsClaimed.events.RewardsClaimed.returnValues._amount}
+            expect(Number(userInfo.pendingReward)).to.be.equal(0)
+        })
+        it("If user pendingRewards are 0, an error must be returned", async function(){
+            const user = userTransactions[0]
+            try {
+                await proxy.methods.claimRewards().send({from: user.address})
+            } catch (e) {
+                expect(e).to.be.revertedWith("el monto de recompensas debe ser mayor a 0")
+            }
+        })
+        it("user must have his claimed TokenFarm rewards in DappTokens balance",async function(){
+            const user = userTransactions[0]
+            const balanceDapp = await dappToken.methods.balanceOf(user.address).call({from: user.address})
+            expect(balanceDapp).to.be.equal(user.rewards)
+        })
+    })
 
 	describe("Que un usuario pueda deshacer el staking de todos los tokens LP depositados y reclamar recompensas pendientes, si las hay.", function(){
-		it("when user call withdraw method, his TokenFarms balance must be 0",async function(){
+		it("after user call withdraw method, his TokenFarms balance must be 0",async function(){
 			const user = userTransactions[1]
 			await proxy.methods.withdraw().send({from: user.address})
 			const userinfo = await proxy.methods.getUserInfo(user.address).call({from: user.address});
 			expect(Number(userinfo.stackingBalance)).to.be.equal(0)
+			try {
+				await proxy.methods.withdraw().send({from: user.address})
+			} catch (e) {
+				expect(e.customErrorArguments.message).to.be.revertedWith("el balance del Stack del usuario no es mayor a cero")
+			}
 		})
 		it("after user had been called withdraw TokenFarm method, the raise in balance of LpToken must be the amount",async function(){
 			const user = userTransactions[1]
 			const lpBalance = await lpToken.methods.balanceOf(user.address).call({from: user.address})
 			expect(Number(user.amount)).to.be.equal(Number(lpBalance))
 		})
+		it("An error must be thrown if some user attempts to call withdraw function and never was a Staker", async function(){
+		const [owner, a,b,c,d,e] = await web3.eth.getAccounts();
+		try {
+			await proxy.methods.withdraw().send({from: e})
+		} catch (e) {
+			expect(e.customErrorArguments.message).to.be.revertedWith("el balance del Stack del usuario no es mayor a cero")
+		}
+	})
 		it("after user had been called withdraw TokenFarm method, it should be able to claimRewards and receive in DappToken the pending rewards", async function () {
 			const user = userTransactions[1]
 			const balanceBeforeRewards = await dappToken.methods.balanceOf(user.address).call({from: user.address})
@@ -186,4 +230,32 @@ describe('TokenFarmV1', function () {
 			expect(Number(rewardsClaimed.events.RewardsClaimed.returnValues._amount)).to.be.equal(Number(balanceAfterRewards)-Number(balanceBeforeRewards))
 		})
 	})
+
+	describe("The owner can be able to change the reward per static range of blocks", function() {
+		it("Only the owner can update Rewards range",async function() {
+			const [ owner, otherAccount] = await web3.eth.getAccounts()
+			try {
+				await proxy.methods.updateRewardRange(150, 1e11).send({from: otherAccount})
+			} catch (e) {
+				expect(e).to.be.revertedWith("message be kind of unauthorized")
+			}
+		})
+		it("If the range provided to update doesn't exist in the mapping, it should be an error",async function() {
+			const owner = await proxy.methods.owner().call();
+			try {
+				await proxy.methods.updateRewardRange(150, 1e11).send({from: owner})
+			} catch (e) {
+				expect(e).to.be.revertedWith("the range provided does`nt exist")
+			}
+		})
+        it("when the owner call updateRewardRange method, it should be saved", async function() {
+            const [owner] = await web3.eth.getAccounts();
+            const updatedReward = await proxy.methods.updateRewardRange(10,1e10).send({from: owner});
+            expect(Number(updatedReward.events.RangeRewardUpdated.returnValues._reward)).to.be.equal(1e10);
+			const updatedRewar2 = await proxy.methods.updateRewardRange(100,1e12).send({from: owner});
+			expect(Number(updatedRewar2.events.RangeRewardUpdated.returnValues._reward)).to.be.equal(1e12);
+			const updatedRewar3 = await proxy.methods.updateRewardRange(1000,1e15).send({from: owner});
+			expect(Number(updatedRewar3.events.RangeRewardUpdated.returnValues._reward)).to.be.equal(1e15);
+        })
+    })
 });
