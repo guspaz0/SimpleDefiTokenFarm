@@ -24,11 +24,11 @@ describe('DappToken', function () {
     it("solo el owner puede mintear",async function(){
         const [owner, otherAccount] = await web3.eth.getAccounts()
         try {
-            await dappToken.methods.mint(otherAccount, 1000).send({from: otherAccount}) 
+            await dappToken.methods.mint(otherAccount, "1000").send({from: otherAccount}) 
         } catch (e) {
             expect(e).to.be.revertedWith("")
         }
-        const amountMinted = await dappToken.methods.mint(otherAccount, 1000).send({from: owner})
+        const amountMinted = await dappToken.methods.mint(otherAccount, "1000").send({from: owner})
         expect(amountMinted).to.be.ok
     })
 })
