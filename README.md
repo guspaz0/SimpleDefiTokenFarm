@@ -16,6 +16,11 @@ Comando para ayuda de hardhat:
 ```shell
 npx hardhat help
 ```
+
+Comando de hardhat para generar informes de cobertura de los tests:
+```shell
+npx hardhat coverage
+```
 ---
 ## TokenFarm "V1"
 La version "original" del Smart Contract pero modificada para ser 'upgradeable' mediante un Proxy transparente y actualizable por el contracto "Proxy Admin" del mismo. 
